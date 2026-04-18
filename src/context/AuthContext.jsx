@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut 
@@ -31,6 +32,11 @@ export function AuthProvider({ children }) {
     return signInWithEmailAndPassword(auth, email, password);
   };
 
+  // YENİ EKLENDİ: E-posta ile Kayıt Olma
+  const registerWithEmail = (email, password) => {
+    return createUserWithEmailAndPassword(auth, email, password);
+  };
+
   const loginWithGoogle = () => {
     const provider = new GoogleAuthProvider();
     return signInWithPopup(auth, provider);
@@ -43,6 +49,7 @@ export function AuthProvider({ children }) {
   const value = {
     currentUser,
     loginWithEmail,
+    registerWithEmail,
     loginWithGoogle,
     logout
   };

@@ -1,26 +1,36 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Leaf, Mail, Lock, LogIn } from 'lucide-react';
+import { Leaf, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
 
 export default function Login() {
-  const[email, setEmail] = useState('');
+  const [isLogin, setIsLogin] = useState(true); // Giriş mi, Kayıt mı modu
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const[error, setError] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { loginWithEmail, loginWithGoogle } = useAuth();
+  const { loginWithEmail, registerWithEmail, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
-  const handleEmailLogin = async (e) => {
+  const handleEmailAuth = async (e) => {
     e.preventDefault();
     try {
       setError('');
       setLoading(true);
-      await loginWithEmail(email, password);
+      
+      if (isLogin) {
+        await loginWithEmail(email, password);
+      } else {
+        await registerWithEmail(email, password);
+      }
       navigate('/');
     } catch (err) {
-      setError('Giriş başarısız. Hesabın olduğundan veya şifrenin doğruluğundan emin ol.');
+      if (!isLogin) {
+        setError('Kayıt başarısız. Şifre en az 6 karakter olmalı veya bu e-posta zaten kullanılıyor.');
+      } else {
+        setError('Giriş başarısız. Hesabın olduğundan veya şifrenin doğruluğundan emin ol.');
+      }
     } finally {
       setLoading(false);
     }
@@ -33,7 +43,7 @@ export default function Login() {
       await loginWithGoogle();
       navigate('/');
     } catch (err) {
-      setError('Google ile giriş başarısız.');
+      setError('Google ile işlem başarısız oldu. Firebase yetkili alan adlarını (Authorized domains) kontrol edin.');
     } finally {
       setLoading(false);
     }
@@ -56,7 +66,7 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleEmailLogin} className="space-y-4">
+        <form onSubmit={handleEmailAuth} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-olive mb-1">E-posta</label>
             <div className="relative">
@@ -78,6 +88,7 @@ export default function Login() {
               <input
                 type="password"
                 required
+                minLength="6"
                 className="w-full pl-10 pr-4 py-2 border border-sage/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage/50 bg-cream/30 text-olive"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -88,12 +99,22 @@ export default function Login() {
           <button
             disabled={loading}
             type="submit"
-            className="w-full bg-sage hover:bg-sage/90 text-white font-medium py-2.5 rounded-xl transition-colors flex justify-center items-center gap-2 mt-2"
+            className="w-full bg-sage hover:bg-sage/90 text-white font-medium py-2.5 rounded-xl transition-colors flex justify-center items-center gap-2 mt-2 shadow-sm"
           >
-            <LogIn size={18} />
-            Giriş Yap
+            {isLogin ? <LogIn size={18} /> : <UserPlus size={18} />}
+            {isLogin ? 'Giriş Yap' : 'Kayıt Ol'}
           </button>
         </form>
+
+        <div className="mt-4 text-center">
+          <button 
+            type="button"
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-sm text-sage hover:text-olive transition-colors font-medium"
+          >
+            {isLogin ? "Hesabın yok mu? Kayıt Ol" : "Zaten hesabın var mı? Giriş Yap"}
+          </button>
+        </div>
 
         <div className="mt-6 border-t border-sage/20 pt-6">
           <button
@@ -107,7 +128,7 @@ export default function Login() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
-            Google ile Giriş
+            Google ile Giriş / Kayıt
           </button>
         </div>
       </div>
