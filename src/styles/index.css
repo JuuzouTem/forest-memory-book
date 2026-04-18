@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cream text-olive font-sans antialiased;
+    /* Mobilde yatay kaydırmayı ve çift tıklama yakınlaştırmasını önlemek için */
+    touch-action: manipulation;
+    overflow-x: hidden;
+  }
+}
+
+/* Scrollbar'ı gizleyip fonksiyonunu korumak için (Tagging sistemi için kullanılacak) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
