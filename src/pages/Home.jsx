@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-// İkonlar Güncellendi
 import { LogOut, Trees, Map as MapIcon, ShieldCheck, DoorOpen, User } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
@@ -27,10 +26,10 @@ export default function Home() {
     return () => unsubscribe();
   }, [userProfile?.coupleId]);
 
-  // YENİ: Veritabanındaki tüm etiketleri bir havuzda topla (Tekrarsız)
+  // Veritabanındaki tüm etiketleri bir havuzda topla (Tekrarsız)
   const availableTags =[...new Set(memories.flatMap(m => m.tags || []))];
 
-  // YENİ: Kullanıcı Adı Değiştirme Promptu
+  // Kullanıcı Adı Değiştirme Promptu
   const handleChangeName = async () => {
     const newName = window.prompt("Yeni kullanıcı adınızı girin:", currentUser?.displayName || "");
     if (newName && newName.trim() !== "") {
@@ -38,7 +37,7 @@ export default function Home() {
     }
   };
 
-  // YENİ: Baloncuktan Çıkma (Hesaptan çıkmaz, sadece odayı terk eder)
+  // Baloncuktan Çıkma
   const handleLeaveBubble = async () => {
     if (window.confirm("Bu baloncuktan çıkmak istediğinize emin misiniz? (Fotoğraflarınız silinmez, sadece bağınız kopar)")) {
       await saveCoupleId(null);
@@ -62,7 +61,6 @@ export default function Home() {
 
   return (
     <div className="p-4 flex flex-col items-center min-h-screen pb-20">
-      {/* Üst Bar Tasarımı Yenilendi */}
       <div className="w-full max-w-lg flex justify-between items-center bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-sage/20 mb-4 sticky top-4 z-10">
         <div className="flex items-center gap-2 text-sage">
           <Trees size={24} />
@@ -77,7 +75,18 @@ export default function Home() {
       </div>
       
       <div className="w-full max-w-lg">
-        {/* Etiketleri Uploader'a gönderiyoruz */}
         <Uploader availableTags={availableTags} />
         {loadingMemories ? (
-          <div classN
+          <div className="mt-8 text-center text-sage">
+            <div className="animate-pulse flex flex-col items-center gap-2">
+              <Trees className="animate-bounce" size={32} />
+              <p className="text-sm">Gizli anılarınız toplanıyor...</p>
+            </div>
+          </div>
+        ) : (
+          <MasonryGrid memories={memories} />
+        )}
+      </div>
+    </div>
+  );
+}
