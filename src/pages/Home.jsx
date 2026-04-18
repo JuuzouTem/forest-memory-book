@@ -8,15 +8,15 @@ import Uploader from '../components/camera/Uploader';
 import MasonryGrid from '../components/gallery/MasonryGrid';
 
 export default function Home() {
-  const { logout, currentUser, userProfile, saveCoupleId } = useAuth();
+  const { logout, userProfile, saveCoupleId } = useAuth();
   const navigate = useNavigate();
-  const[memories, setMemories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const[bubbleInput, setBubbleInput] = useState('');
+  const [memories, setMemories] = useState([]);
+  const[loadingMemories, setLoadingMemories] = useState(true);
+  const [bubbleInput, setBubbleInput] = useState('');
 
   // SADECE GİZLİ BALONCUK KODUNA SAHİP ANILARI ÇEK
   useEffect(() => {
-    if (!userProfile?.coupleId) return;
+    if (!userProfile || !userProfile.coupleId) return;
 
     const q = query(
       collection(db, 'memories'),
@@ -29,7 +29,6 @@ export default function Home() {
         ...doc.data()
       }));
       
-      // Tarihe göre yeniden eskiye sırala (Frontend'de yapıyoruz ki Firebase karmaşık index hatası vermesin)
       memoriesData.sort((a, b) => {
         const timeA = a.createdAt?.toMillis() || 0;
         const timeB = b.createdAt?.toMillis() || 0;
@@ -37,14 +36,14 @@ export default function Home() {
       });
 
       setMemories(memoriesData);
-      setLoading(false);
+      setLoadingMemories(false);
     });
 
     return () => unsubscribe();
   }, [userProfile?.coupleId]);
 
-  // EĞER BALONCUK KODU YOKSA GÜVENLİK EKRANINI GÖSTER
-  if (userProfile && !userProfile.coupleId) {
+  // EĞER KULLANICININ BALONCUK KODU YOKSA KESİNLİKLE BU EKRANI GÖSTER
+  if (!userProfile || !userProfile.coupleId) {
     return (
       <div className="min-h-screen bg-cream flex flex-col items-center justify-center p-4">
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-sage/20 max-w-sm w-full text-center">
@@ -101,7 +100,7 @@ export default function Home() {
       
       <div className="w-full max-w-lg">
         <Uploader />
-        {loading ? (
+        {loadingMemories ? (
           <div className="mt-8 text-center text-sage">
             <div className="animate-pulse flex flex-col items-center gap-2">
               <Trees className="animate-bounce" size={32} />

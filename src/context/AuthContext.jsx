@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebaseConfig';
+import { Trees } from 'lucide-react'; // Yükleme ekranı ikonu için
 
 const AuthContext = createContext();
 
@@ -18,27 +19,34 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const[userProfile, setUserProfile] = useState(null); // Yeni: Kullanıcı Profili (Baloncuk kodu için)
+  const [userProfile, setUserProfile] = useState(null);
   const[loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      
       if (user) {
-        // Kullanıcı giriş yaptıysa Firestore'dan profilini çek
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          setUserProfile(docSnap.data());
-        } else {
+        setCurrentUser(user);
+        try {
+          // Kullanıcı giriş yaptıysa Firestore'dan profilini çekmeyi dene
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            setUserProfile(docSnap.data());
+          } else {
+            setUserProfile({ coupleId: null });
+          }
+        } catch (error) {
+          console.error("Profil çekme hatası:", error);
+          // Hata olsa bile uygulamayı kilitleme, kodu sorması için boş profil ayarla
           setUserProfile({ coupleId: null });
         }
       } else {
+        setCurrentUser(null);
         setUserProfile(null);
       }
       
+      // Her halükarda yükleme ekranını kapat (Beyaz ekranı engeller)
       setLoading(false);
     });
 
@@ -50,11 +58,15 @@ export function AuthProvider({ children }) {
   const loginWithGoogle = () => signInWithPopup(auth, new GoogleAuthProvider());
   const logout = () => signOut(auth);
 
-  // Yeni: Baloncuk Kodunu Kaydetme Fonksiyonu
   const saveCoupleId = async (code) => {
     if (!currentUser) return;
-    await setDoc(doc(db, "users", currentUser.uid), { coupleId: code }, { merge: true });
-    setUserProfile({ ...userProfile, coupleId: code });
+    try {
+      await setDoc(doc(db, "users", currentUser.uid), { coupleId: code }, { merge: true });
+      setUserProfile({ ...userProfile, coupleId: code });
+    } catch (error) {
+      console.error("Kod kaydetme hatası:", error);
+      alert("Kod kaydedilirken bir hata oluştu.");
+    }
   };
 
   const value = {
@@ -69,7 +81,14 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading ? (
+        <div className="min-h-screen bg-cream flex flex-col items-center justify-center text-sage">
+          <Trees className="animate-pulse mb-4" size={48} />
+          <span className="font-medium">Ormana giriliyor...</span>
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 }
