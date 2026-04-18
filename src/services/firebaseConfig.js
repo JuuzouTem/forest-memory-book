@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+// YENİ: getFirestore yerine çevrimdışı destekli modülleri ekledik
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 // TODO: Kendi Firebase bilgilerini buraya tekrar koymayı unutma
 const firebaseConfig = {
@@ -12,9 +13,10 @@ const firebaseConfig = {
   appId: "1:184063545597:web:a507c879be606318086e94"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// Sadece Auth ve Firestore kullanıyoruz
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// YENİ: Çevrimdışı (Orman) modu ve sıfır gecikme için yerel önbellek aktifleştirildi
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+});

@@ -7,9 +7,9 @@ import {
   signInWithPopup, 
   signOut 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore'; // getDoc çıkarıldı, onSnapshot eklendi
 import { auth, db } from '../services/firebaseConfig';
-import { Trees } from 'lucide-react'; // Yükleme ekranı ikonu için
+import { Trees } from 'lucide-react';
 
 const AuthContext = createContext();
 
@@ -19,38 +19,44 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const[loading, setLoading] = useState(true);
+  const[userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let profileUnsubscribe = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
-        try {
-          // Kullanıcı giriş yaptıysa Firestore'dan profilini çekmeyi dene
-          const docRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(docRef);
-          
+        
+        // YENİ: await getDoc beklemesi iptal edildi. onSnapshot ile anında tepki veriyoruz!
+        const docRef = doc(db, "users", user.uid);
+        profileUnsubscribe = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists()) {
             setUserProfile(docSnap.data());
           } else {
             setUserProfile({ coupleId: null });
           }
-        } catch (error) {
-          console.error("Profil çekme hatası:", error);
-          // Hata olsa bile uygulamayı kilitleme, kodu sorması için boş profil ayarla
+          setLoading(false); // Veri gelir gelmez veya önbellekten okunur okunmaz yüklemeyi bitir
+        }, (error) => {
+          // Eğer reklam engelleyici engellerse 10 saniye beklemez, anında buraya düşer ve sayfayı açar!
+          console.warn("Çevrimdışı bağlantı uyarısı (Hızlı geçiş yapıldı):", error.message);
           setUserProfile({ coupleId: null });
-        }
+          setLoading(false);
+        });
+
       } else {
         setCurrentUser(null);
         setUserProfile(null);
+        setLoading(false);
+        if (profileUnsubscribe) profileUnsubscribe();
       }
-      
-      // Her halükarda yükleme ekranını kapat (Beyaz ekranı engeller)
-      setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeAuth();
+      if (profileUnsubscribe) profileUnsubscribe();
+    };
   },[]);
 
   const loginWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
@@ -62,7 +68,7 @@ export function AuthProvider({ children }) {
     if (!currentUser) return;
     try {
       await setDoc(doc(db, "users", currentUser.uid), { coupleId: code }, { merge: true });
-      setUserProfile({ ...userProfile, coupleId: code });
+      // onSnapshot otomatik tetikleneceği için state'i manuel güncellememize gerek yok
     } catch (error) {
       console.error("Kod kaydetme hatası:", error);
       alert("Kod kaydedilirken bir hata oluştu.");
