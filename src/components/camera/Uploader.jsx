@@ -9,15 +9,14 @@ import VoiceRecorder from '../audio/VoiceRecorder';
 
 const MOODS =[ { emoji: '🌿', label: 'Huzurlu' }, { emoji: '🌧️', label: 'Yağmurlu' }, { emoji: '☕', label: 'Sıcak' }, { emoji: '✨', label: 'Büyülü' }, { emoji: '😴', label: 'Yorgun' } ];
 
-// YENİ: availableTags prop olarak alındı
 export default function Uploader({ availableTags =[] }) {
   const { currentUser, userProfile } = useAuth();
-  const [isUploading, setIsUploading] = useState(false);
+  const[isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const[selectedFile, setSelectedFile] = useState(null);
   const [tags, setTags] = useState([]);
   const[selectedMood, setSelectedMood] = useState(null);
-  const [audioFile, setAudioFile] = useState(null);
+  const[audioFile, setAudioFile] = useState(null);
   const [locationEnabled, setLocationEnabled] = useState(true);
 
   const fileInputRef = useRef(null);
@@ -30,24 +29,25 @@ export default function Uploader({ availableTags =[] }) {
     setPreviewUrl(URL.createObjectURL(file));
   };
 
-  // YENİ: İptal ve Yükleme sonrası takılı kalmaları engelleyen kusursuz sıfırlama
   const handleCancel = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
     setTags([]);
     setSelectedMood(null);
     setAudioFile(null);
-    setIsUploading(false); // Takılı kalmayı önler
+    setIsUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
+  // Konum alınırken sonsuza kadar takılmasını engellemek için 5 saniye limit (timeout) eklendi
   const getLocation = () => {
     return new Promise((resolve) => {
       if (!locationEnabled || !navigator.geolocation) return resolve(null);
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null), { enableHighAccuracy: true }
+        () => resolve(null), 
+        { enableHighAccuracy: true, timeout: 5000 }
       );
     });
   };
@@ -56,23 +56,38 @@ export default function Uploader({ availableTags =[] }) {
     if (!selectedFile || !currentUser || !userProfile?.coupleId) return;
     try {
       setIsUploading(true);
+      
+      // 1. Resim ve Ses (Ağ gerektiren zorunlu işlemler)
       const imageUrl = await uploadFileToCloudinary(selectedFile, 'image');
       let audioUrl = null;
       if (audioFile) audioUrl = await uploadFileToCloudinary(audioFile, 'video');
+      
+      // 2. Konum bekle
       const location = await getLocation();
 
-      await addDoc(collection(db, 'memories'), {
-        imageUrl, audioUrl, mood: selectedMood, location, coupleId: userProfile.coupleId,
+      // 3. Veritabanına Yazma (DİKKAT: 'await' KALDIRILDI!)
+      // Bu sayede reklam engelleyiciler bağlantıyı kesse bile uygulama takılı kalmayacak.
+      // Firebase işlemi arka planda gizlice tamamlayacak.
+      addDoc(collection(db, 'memories'), {
+        imageUrl, 
+        audioUrl, 
+        mood: selectedMood, 
+        location, 
+        coupleId: userProfile.coupleId,
         uploadedBy: currentUser.uid,
-        uploaderName: currentUser.displayName || "Orman Sakini", // İsim yoksa default atar
-        createdAt: serverTimestamp(), tags,
-      });
+        uploaderName: currentUser.displayName || "Orman Sakini",
+        createdAt: serverTimestamp(), 
+        tags,
+      }).catch(err => console.warn("Firestore arka plan eşitleme uyarısı:", err));
 
-      handleCancel(); // Başarılıysa her şeyi temizle
+      // 4. Ekranı hemen temizle
+      handleCancel(); 
+
     } catch (error) {
       console.error("Yükleme hatası:", error);
-      alert("Anı yüklenirken bir hata oluştu.");
-      setIsUploading(false); // Hata verirse butonu eski haline getir
+      alert("Anı yüklenirken bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setIsUploading(false); // Her ihtimale karşı butonu serbest bırak
     }
   };
 
@@ -89,10 +104,7 @@ export default function Uploader({ availableTags =[] }) {
               <button key={mood.label} onClick={() => setSelectedMood(selectedMood === mood.emoji ? null : mood.emoji)} className={`text-2xl p-2 rounded-lg transition-transform ${selectedMood === mood.emoji ? 'bg-sage/30 scale-110' : 'hover:bg-sage/10 grayscale hover:grayscale-0'}`} title={mood.label}>{mood.emoji}</button>
             ))}
           </div>
-          
-          {/* TagInput'a geçmiş etiketler gönderildi */}
           <TagInput selectedTags={tags} setSelectedTags={setTags} availableTags={availableTags} />
-          
           <VoiceRecorder onAudioReady={setAudioFile} onClear={() => setAudioFile(null)} />
           <button onClick={() => setLocationEnabled(!locationEnabled)} className={`flex items-center gap-2 text-sm p-2 rounded-xl border transition-colors ${locationEnabled ? 'bg-sage/20 border-sage/40 text-sage' : 'bg-gray-100 border-gray-200 text-gray-400'}`}><MapPin size={16} />{locationEnabled ? 'Konum Eklenecek' : 'Konum Kapalı'}</button>
           <button onClick={handleUpload} disabled={isUploading} className="w-full py-3 mt-2 bg-sage hover:bg-sage/90 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-colors">
@@ -106,7 +118,6 @@ export default function Uploader({ availableTags =[] }) {
         </div>
       )}
 
-      {/* YENİ: Kapatma (X) hatasını kökten çözen hamle. İnputlar her zaman DOM'da kalır. */}
       <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
       <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
     </div>
