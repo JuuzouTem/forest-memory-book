@@ -7,7 +7,8 @@ import {
   signInWithPopup, 
   signOut 
 } from 'firebase/auth';
-import { auth } from '../services/firebaseConfig';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebaseConfig';
 
 const AuthContext = createContext();
 
@@ -17,37 +18,49 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const[userProfile, setUserProfile] = useState(null); // Yeni: Kullanıcı Profili (Baloncuk kodu için)
+  const[loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      
+      if (user) {
+        // Kullanıcı giriş yaptıysa Firestore'dan profilini çek
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          setUserProfile(docSnap.data());
+        } else {
+          setUserProfile({ coupleId: null });
+        }
+      } else {
+        setUserProfile(null);
+      }
+      
       setLoading(false);
     });
 
     return unsubscribe;
   },[]);
 
-  const loginWithEmail = (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
-  };
+  const loginWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  const registerWithEmail = (email, password) => createUserWithEmailAndPassword(auth, email, password);
+  const loginWithGoogle = () => signInWithPopup(auth, new GoogleAuthProvider());
+  const logout = () => signOut(auth);
 
-  // YENİ EKLENDİ: E-posta ile Kayıt Olma
-  const registerWithEmail = (email, password) => {
-    return createUserWithEmailAndPassword(auth, email, password);
-  };
-
-  const loginWithGoogle = () => {
-    const provider = new GoogleAuthProvider();
-    return signInWithPopup(auth, provider);
-  };
-
-  const logout = () => {
-    return signOut(auth);
+  // Yeni: Baloncuk Kodunu Kaydetme Fonksiyonu
+  const saveCoupleId = async (code) => {
+    if (!currentUser) return;
+    await setDoc(doc(db, "users", currentUser.uid), { coupleId: code }, { merge: true });
+    setUserProfile({ ...userProfile, coupleId: code });
   };
 
   const value = {
     currentUser,
+    userProfile,
+    saveCoupleId,
     loginWithEmail,
     registerWithEmail,
     loginWithGoogle,
