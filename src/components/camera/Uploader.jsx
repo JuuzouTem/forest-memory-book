@@ -7,16 +7,11 @@ import { useAuth } from '../../context/AuthContext';
 import TagInput from '../tags/TagInput';
 import VoiceRecorder from '../audio/VoiceRecorder';
 
-const MOODS =[
-  { emoji: '🌿', label: 'Huzurlu' },
-  { emoji: '🌧️', label: 'Yağmurlu' },
-  { emoji: '☕', label: 'Sıcak' },
-  { emoji: '✨', label: 'Büyülü' },
-  { emoji: '😴', label: 'Yorgun' }
-];
+const MOODS =[ { emoji: '🌿', label: 'Huzurlu' }, { emoji: '🌧️', label: 'Yağmurlu' }, { emoji: '☕', label: 'Sıcak' }, { emoji: '✨', label: 'Büyülü' }, { emoji: '😴', label: 'Yorgun' } ];
 
-export default function Uploader() {
-  const { currentUser, userProfile } = useAuth(); // userProfile eklendi
+// YENİ: availableTags prop olarak alındı
+export default function Uploader({ availableTags =[] }) {
+  const { currentUser, userProfile } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const[selectedFile, setSelectedFile] = useState(null);
@@ -35,33 +30,30 @@ export default function Uploader() {
     setPreviewUrl(URL.createObjectURL(file));
   };
 
+  // YENİ: İptal ve Yükleme sonrası takılı kalmaları engelleyen kusursuz sıfırlama
   const handleCancel = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
     setTags([]);
     setSelectedMood(null);
     setAudioFile(null);
+    setIsUploading(false); // Takılı kalmayı önler
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
   const getLocation = () => {
     return new Promise((resolve) => {
-      if (!locationEnabled || !navigator.geolocation) {
-        resolve(null);
-        return;
-      }
+      if (!locationEnabled || !navigator.geolocation) return resolve(null);
       navigator.geolocation.getCurrentPosition(
-        (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-        () => resolve(null),
-        { enableHighAccuracy: true }
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null), { enableHighAccuracy: true }
       );
     });
   };
 
   const handleUpload = async () => {
     if (!selectedFile || !currentUser || !userProfile?.coupleId) return;
-
     try {
       setIsUploading(true);
       const imageUrl = await uploadFileToCloudinary(selectedFile, 'image');
@@ -69,25 +61,18 @@ export default function Uploader() {
       if (audioFile) audioUrl = await uploadFileToCloudinary(audioFile, 'video');
       const location = await getLocation();
 
-      // YENİ EKLENDİ: coupleId eklendi. Artık anı mühürlü!
       await addDoc(collection(db, 'memories'), {
-        imageUrl,
-        audioUrl,
-        mood: selectedMood,
-        location,
-        coupleId: userProfile.coupleId, // GÜVENLİK MÜHRÜ
+        imageUrl, audioUrl, mood: selectedMood, location, coupleId: userProfile.coupleId,
         uploadedBy: currentUser.uid,
-        uploaderName: currentUser.displayName || currentUser.email.split('@')[0],
-        createdAt: serverTimestamp(),
-        tags,
+        uploaderName: currentUser.displayName || "Orman Sakini", // İsim yoksa default atar
+        createdAt: serverTimestamp(), tags,
       });
 
-      handleCancel();
+      handleCancel(); // Başarılıysa her şeyi temizle
     } catch (error) {
       console.error("Yükleme hatası:", error);
       alert("Anı yüklenirken bir hata oluştu.");
-    } finally {
-      setIsUploading(false);
+      setIsUploading(false); // Hata verirse butonu eski haline getir
     }
   };
 
@@ -104,7 +89,10 @@ export default function Uploader() {
               <button key={mood.label} onClick={() => setSelectedMood(selectedMood === mood.emoji ? null : mood.emoji)} className={`text-2xl p-2 rounded-lg transition-transform ${selectedMood === mood.emoji ? 'bg-sage/30 scale-110' : 'hover:bg-sage/10 grayscale hover:grayscale-0'}`} title={mood.label}>{mood.emoji}</button>
             ))}
           </div>
-          <TagInput selectedTags={tags} setSelectedTags={setTags} />
+          
+          {/* TagInput'a geçmiş etiketler gönderildi */}
+          <TagInput selectedTags={tags} setSelectedTags={setTags} availableTags={availableTags} />
+          
           <VoiceRecorder onAudioReady={setAudioFile} onClear={() => setAudioFile(null)} />
           <button onClick={() => setLocationEnabled(!locationEnabled)} className={`flex items-center gap-2 text-sm p-2 rounded-xl border transition-colors ${locationEnabled ? 'bg-sage/20 border-sage/40 text-sage' : 'bg-gray-100 border-gray-200 text-gray-400'}`}><MapPin size={16} />{locationEnabled ? 'Konum Eklenecek' : 'Konum Kapalı'}</button>
           <button onClick={handleUpload} disabled={isUploading} className="w-full py-3 mt-2 bg-sage hover:bg-sage/90 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-colors">
@@ -113,10 +101,14 @@ export default function Uploader() {
         </div>
       ) : (
         <div className="flex gap-3 mb-2">
-          <button onClick={() => cameraInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center gap-2 py-6 bg-sage/10 text-sage hover:bg-sage/20 rounded-xl border border-sage/30 transition-colors"><Camera size={28} /><span className="text-sm font-medium">Kamera</span><input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} /></button>
-          <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center gap-2 py-6 bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 rounded-xl border border-dustyRose/30 transition-colors"><ImagePlus size={28} /><span className="text-sm font-medium">Galeri</span><input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} /></button>
+          <button onClick={() => cameraInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center gap-2 py-6 bg-sage/10 text-sage hover:bg-sage/20 rounded-xl border border-sage/30 transition-colors"><Camera size={28} /><span className="text-sm font-medium">Kamera</span></button>
+          <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center gap-2 py-6 bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 rounded-xl border border-dustyRose/30 transition-colors"><ImagePlus size={28} /><span className="text-sm font-medium">Galeri</span></button>
         </div>
       )}
+
+      {/* YENİ: Kapatma (X) hatasını kökten çözen hamle. İnputlar her zaman DOM'da kalır. */}
+      <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
+      <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
     </div>
   );
 }

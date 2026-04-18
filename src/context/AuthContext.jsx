@@ -1,50 +1,35 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signOut 
+  onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  GoogleAuthProvider, signInWithPopup, signOut, updateProfile // updateProfile eklendi
 } from 'firebase/auth';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore'; // getDoc çıkarıldı, onSnapshot eklendi
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../services/firebaseConfig';
 import { Trees } from 'lucide-react';
 
 const AuthContext = createContext();
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export function useAuth() { return useContext(AuthContext); }
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const[userProfile, setUserProfile] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let profileUnsubscribe = null;
-
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
-        
-        // YENİ: await getDoc beklemesi iptal edildi. onSnapshot ile anında tepki veriyoruz!
         const docRef = doc(db, "users", user.uid);
         profileUnsubscribe = onSnapshot(docRef, (docSnap) => {
-          if (docSnap.exists()) {
-            setUserProfile(docSnap.data());
-          } else {
-            setUserProfile({ coupleId: null });
-          }
-          setLoading(false); // Veri gelir gelmez veya önbellekten okunur okunmaz yüklemeyi bitir
+          if (docSnap.exists()) setUserProfile(docSnap.data());
+          else setUserProfile({ coupleId: null });
+          setLoading(false);
         }, (error) => {
-          // Eğer reklam engelleyici engellerse 10 saniye beklemez, anında buraya düşer ve sayfayı açar!
-          console.warn("Çevrimdışı bağlantı uyarısı (Hızlı geçiş yapıldı):", error.message);
           setUserProfile({ coupleId: null });
           setLoading(false);
         });
-
       } else {
         setCurrentUser(null);
         setUserProfile(null);
@@ -52,11 +37,7 @@ export function AuthProvider({ children }) {
         if (profileUnsubscribe) profileUnsubscribe();
       }
     });
-
-    return () => {
-      unsubscribeAuth();
-      if (profileUnsubscribe) profileUnsubscribe();
-    };
+    return () => { unsubscribeAuth(); if (profileUnsubscribe) profileUnsubscribe(); };
   },[]);
 
   const loginWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
@@ -66,24 +47,18 @@ export function AuthProvider({ children }) {
 
   const saveCoupleId = async (code) => {
     if (!currentUser) return;
-    try {
-      await setDoc(doc(db, "users", currentUser.uid), { coupleId: code }, { merge: true });
-      // onSnapshot otomatik tetikleneceği için state'i manuel güncellememize gerek yok
-    } catch (error) {
-      console.error("Kod kaydetme hatası:", error);
-      alert("Kod kaydedilirken bir hata oluştu.");
+    await setDoc(doc(db, "users", currentUser.uid), { coupleId: code }, { merge: true });
+  };
+
+  // YENİ: Kullanıcı adı güncelleme
+  const updateUsername = async (name) => {
+    if (currentUser) {
+      await updateProfile(currentUser, { displayName: name });
+      setCurrentUser({ ...currentUser, displayName: name });
     }
   };
 
-  const value = {
-    currentUser,
-    userProfile,
-    saveCoupleId,
-    loginWithEmail,
-    registerWithEmail,
-    loginWithGoogle,
-    logout
-  };
+  const value = { currentUser, userProfile, saveCoupleId, updateUsername, loginWithEmail, registerWithEmail, loginWithGoogle, logout };
 
   return (
     <AuthContext.Provider value={value}>
@@ -92,9 +67,7 @@ export function AuthProvider({ children }) {
           <Trees className="animate-pulse mb-4" size={48} />
           <span className="font-medium">Ormana giriliyor...</span>
         </div>
-      ) : (
-        children
-      )}
+      ) : children}
     </AuthContext.Provider>
   );
 }
