@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/forest-memory-book/sw.js', { scope: '/forest-memory-book/' })})}
