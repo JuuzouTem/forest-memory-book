@@ -1,9 +1,10 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// SADECE BURASI DEĞİŞTİ: BrowserRouter yerine HashRouter yazdık
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Home from './pages/Home';
-import MapView from './pages/MapView'; // YENİ
+import MapView from './pages/MapView';
 
 const PrivateRoute = ({ children }) => {
   const { currentUser } = useAuth();
@@ -27,7 +28,6 @@ function App() {
               } 
             />
             
-            {/* Yeni Harita Rotası */}
             <Route 
               path="/map" 
               element={
